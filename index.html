@@ -181,6 +181,8 @@
     }
     .due-panel strong { color: var(--maroon); display:block; }
     .due-panel span { color: var(--muted); display:block; font-size: 14px; margin-top: 3px; }
+    .due-actions { display:flex; flex-wrap:wrap; gap: 8px; justify-content:flex-end; }
+    .btn.warning { background: #fff7ea; color: var(--maroon); border: 1px solid rgba(184,138,45,.32); box-shadow: none; }
     .section-head { display:flex; align-items:flex-end; justify-content:space-between; gap:16px; margin: 34px 0 16px; }
     h2 { font-family: Georgia, "Times New Roman", serif; font-size: clamp(32px, 5vw, 52px); line-height: 1; margin: 0; color: var(--maroon); }
     .section-lead { color: var(--muted); margin: 6px 0 0; max-width: 760px; }
@@ -214,7 +216,7 @@
       position: relative;
     }
     .event.due { border-color: rgba(180,54,54,.45); background: linear-gradient(180deg, #fff, #fff7f4); }
-    .event.completed { opacity: .78; border-color: rgba(47,125,79,.36); }
+    .event.completed { opacity: .82; border-color: rgba(47,125,79,.36); background: linear-gradient(180deg, #fff, #f6fff9); }
     .event.completed h4 { text-decoration: line-through; text-decoration-thickness: 2px; text-decoration-color: rgba(47,125,79,.55); }
     .time {
       min-height: 64px;
@@ -270,6 +272,7 @@
       .day-title { top: 158px; align-items:flex-start; flex-direction: column; }
       .toolbar-row { flex-direction: column; align-items: stretch; }
       .live-panel, .due-panel { flex-direction: column; align-items: stretch; }
+      .due-actions { flex-direction: column; }
       .btn.mini { width: 100%; }
     }
     @media (max-width: 520px) {
@@ -324,7 +327,10 @@
         <strong id="dueTitle">Current time check</strong>
         <span id="dueText">Choose a person tab to see if any tasks are due for them.</span>
       </div>
-      <button class="btn mini" id="checkNowButton" type="button">Check due tasks</button>
+      <div class="due-actions">
+        <button class="btn mini" id="checkNowButton" type="button">Check due tasks</button>
+        <button class="btn mini warning" id="showCompletedButton" type="button" hidden>Show completed / Undo</button>
+      </div>
     </div>
 
     <main id="schedule">
@@ -338,13 +344,13 @@
       <div id="scheduleList"></div>
     </main>
 
-    <footer>Connected to your Google Sheet. Assignee tabs rebuild automatically from the latest sheet. Completed personal tasks are hidden on this phone/browser.</footer>
+    <footer>Connected to your Google Sheet. Assignee tabs rebuild automatically from the latest sheet. Completed personal tasks are hidden on this phone/browser, but they can be shown again and undone.</footer>
   </div>
 
   <div class="modal-backdrop" id="completionModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
     <div class="modal">
       <h3 id="modalTitle">Task due</h3>
-      <p id="modalText">Please confirm whether this task has been completed. It will disappear from this person’s tab on this device.</p>
+      <p id="modalText">Please confirm whether this task has been completed. You can undo it later from Show completed / Undo.</p>
       <div class="modal-card" id="modalTaskCard"></div>
       <div class="modal-actions">
         <button class="secondary-dark" id="modalLater" type="button">Remind me later</button>
@@ -363,6 +369,8 @@
     let assigneeList = [];
     let activeAssignee = 'All';
     let modalTask = null;
+    let modalMode = 'due';
+    let showCompletedTasks = false;
     const STORAGE_PREFIX = 'weddingTaskDone:v2:';
     const AUTO_REFRESH_MS = 60 * 1000;
     const REMIND_PREFIX = 'weddingTaskRemindLater:v2:';
@@ -494,7 +502,10 @@
       assigneeList = [...people.entries()]
         .map(([name, counts]) => ({ name, count: counts.remaining, total: counts.total }))
         .sort((a, b) => a.name.localeCompare(b.name));
-      if (activeAssignee !== 'All' && activeAssignee !== 'Unassigned' && !people.has(activeAssignee)) activeAssignee = 'All';
+      if (activeAssignee !== 'All' && activeAssignee !== 'Unassigned' && !people.has(activeAssignee)) {
+        activeAssignee = 'All';
+        showCompletedTasks = false;
+      }
     }
 
     function taskBaseKey(item) {
@@ -536,7 +547,23 @@
     }
 
     function shouldHideCompletedForActiveAssignee(item) {
-      return activeAssignee !== 'All' && activeAssignee !== 'Unassigned' && isCompleted(item, activeAssignee);
+      return activeAssignee !== 'All' && activeAssignee !== 'Unassigned' && !showCompletedTasks && isCompleted(item, activeAssignee);
+    }
+
+    function completedCountForActiveAssignee() {
+      if (activeAssignee === 'All' || activeAssignee === 'Unassigned') return 0;
+      return schedule.filter(item => taskAppliesToAssignee(item, activeAssignee) && isCompleted(item, activeAssignee)).length;
+    }
+
+    function updateCompletedToggle() {
+      const button = document.getElementById('showCompletedButton');
+      if (!button) return;
+      const personMode = activeAssignee !== 'All' && activeAssignee !== 'Unassigned';
+      const count = completedCountForActiveAssignee();
+      button.hidden = !personMode;
+      button.disabled = personMode && count === 0 && !showCompletedTasks;
+      button.textContent = showCompletedTasks ? 'Hide completed tasks' : `Show completed / Undo${count ? ` (${count})` : ''}`;
+      button.title = count ? 'Show completed tasks so you can undo accidental completions' : 'No completed tasks saved on this device for this person';
     }
 
     function visibleItems(ignoreSearch = false) {
@@ -612,17 +639,21 @@
       const assigned = item.assigned ? `<span class="tag">Assigned: ${escapeHTML(item.assigned)}</span>` : '<span class="tag">Unassigned</span>';
       const details = item.details ? `<p class="details">${escapeHTML(item.details)}</p>` : '';
       const personMode = activeAssignee !== 'All' && activeAssignee !== 'Unassigned';
-      const due = personMode && isDue(item);
+      const completed = personMode && isCompleted(item, activeAssignee);
+      const due = personMode && !completed && isDue(item);
       const dueTag = due ? '<span class="tag due">Due now / overdue</span>' : '';
+      const doneTag = completed ? '<span class="tag done">Completed on this device</span>' : '';
       const actions = personMode ? `<div class="event-actions">
-        <button class="action-btn" type="button" data-action="complete" data-row="${item.row}">Confirm completed and hide</button>
+        ${completed
+          ? `<button class="action-btn undo" type="button" data-action="undo" data-row="${item.row}">Undo completed</button>`
+          : `<button class="action-btn" type="button" data-action="complete" data-row="${item.row}">Confirm completed and hide</button>`}
       </div>` : '';
-      return `<article class="event ${due ? 'due' : ''}">
+      return `<article class="event ${due ? 'due' : ''} ${completed ? 'completed' : ''}">
         <div class="time">${escapeHTML(time)}<br><small>${escapeHTML(item.dateISO ? new Date(item.dateISO).toLocaleDateString('en-GB', { day:'numeric', month:'short' }) : 'TBC')}</small></div>
         <div>
           <h4>${escapeHTML(item.task)}</h4>
           ${details}
-          <div class="meta">${assigned}${dueTag}</div>
+          <div class="meta">${assigned}${dueTag}${doneTag}</div>
           ${actions}
         </div>
       </article>`;
@@ -644,7 +675,9 @@
         </section>`).join('');
       let emptyText = 'No schedule items match this tab/search.';
       if (activeAssignee !== 'All' && activeAssignee !== 'Unassigned' && !items.length) {
-        emptyText = `${activeAssignee} has no remaining tasks. Completed tasks are hidden on this device.`;
+        emptyText = showCompletedTasks
+          ? `${activeAssignee} has no tasks to show for this search.`
+          : `${activeAssignee} has no remaining tasks. Press Show completed / Undo if something was completed by mistake.`;
       }
       document.getElementById('scheduleList').innerHTML = html || `<div class="empty">${escapeHTML(emptyText)}</div>`;
       document.getElementById('matchCount').textContent = `${items.length} task${items.length === 1 ? '' : 's'}`;
@@ -655,7 +688,10 @@
       document.getElementById('scheduleHeading').textContent = activeAssignee === 'All' ? 'Schedule' : `${activeAssignee}'s tasks`;
       document.getElementById('scheduleLead').textContent = activeAssignee === 'All'
         ? 'Choose a person tab to show only their remaining tasks in date and time order.'
-        : 'Remaining tasks are shown in date and time order. When a task is confirmed, it disappears from this person’s tab.';
+        : showCompletedTasks
+          ? 'Completed tasks are visible now. Press Undo completed to bring a task back.'
+          : 'Remaining tasks are shown in date and time order. The website asks before hiding a completed task.';
+      updateCompletedToggle();
       updateDuePanel(false);
     }
 
@@ -690,11 +726,19 @@
       }
     }
 
-    function showCompletionModal(item) {
+    function showCompletionModal(item, mode = 'due') {
       if (activeAssignee === 'All' || activeAssignee === 'Unassigned') return;
       modalTask = item;
-      document.getElementById('modalTitle').textContent = `${activeAssignee}, has this been completed?`;
-      document.getElementById('modalText').textContent = 'This task is due or overdue based on the current time on this device. Confirming will hide it from this person’s tab.';
+      modalMode = mode;
+      const manual = mode === 'manual';
+      document.getElementById('modalTitle').textContent = manual
+        ? `${activeAssignee}, confirm this is complete?`
+        : `${activeAssignee}, has this been completed?`;
+      document.getElementById('modalText').textContent = manual
+        ? 'This will hide the task from this person’s remaining list on this device. You can undo it later from Show completed / Undo.'
+        : 'This task is due or overdue based on the current time on this device. Confirming will hide it from this person’s tab. You can undo it later.';
+      document.getElementById('modalLater').textContent = manual ? 'Cancel' : 'Remind me later';
+      document.getElementById('modalComplete').textContent = 'Yes, completed';
       document.getElementById('modalTaskCard').innerHTML = `<strong>${escapeHTML(item.task)}</strong>
         <div>${escapeHTML(item.dateLong || 'Date TBC')} · ${escapeHTML(item.time || 'Time TBC')}</div>
         ${item.details ? `<div style="margin-top:6px; color: var(--muted);">${escapeHTML(item.details)}</div>` : ''}`;
@@ -704,6 +748,7 @@
     function closeCompletionModal() {
       document.getElementById('completionModal').classList.remove('show');
       modalTask = null;
+      modalMode = 'due';
     }
 
     async function loadLiveSheet() {
@@ -731,12 +776,17 @@
 
     document.getElementById('search').addEventListener('input', renderSchedule);
     document.getElementById('refreshButton').addEventListener('click', loadLiveSheet);
-    document.getElementById('allButton').addEventListener('click', () => { activeAssignee = 'All'; renderSchedule(); });
+    document.getElementById('allButton').addEventListener('click', () => { activeAssignee = 'All'; showCompletedTasks = false; renderSchedule(); });
     document.getElementById('checkNowButton').addEventListener('click', () => updateDuePanel(true));
+    document.getElementById('showCompletedButton').addEventListener('click', () => {
+      showCompletedTasks = !showCompletedTasks;
+      renderSchedule();
+    });
     document.getElementById('assigneeTabs').addEventListener('click', (event) => {
       const button = event.target.closest('[data-assignee]');
       if (!button) return;
       activeAssignee = button.dataset.assignee;
+      showCompletedTasks = false;
       renderSchedule();
       updateDuePanel(true);
     });
@@ -746,16 +796,21 @@
       const row = Number(button.dataset.row);
       const item = visibleItems(true).find(task => Number(task.row) === row);
       if (!item) return;
-      setCompleted(item, activeAssignee, button.dataset.action === 'complete');
-      renderSchedule();
+      if (button.dataset.action === 'undo') {
+        setCompleted(item, activeAssignee, false);
+        renderSchedule();
+        return;
+      }
+      showCompletionModal(item, 'manual');
     });
     document.getElementById('modalLater').addEventListener('click', () => {
-      if (modalTask) remindLater(modalTask, activeAssignee);
+      if (modalTask && modalMode === 'due') remindLater(modalTask, activeAssignee);
       closeCompletionModal();
       updateDuePanel(false);
     });
     document.getElementById('modalComplete').addEventListener('click', () => {
       if (modalTask) setCompleted(modalTask, activeAssignee, true);
+      showCompletedTasks = false;
       closeCompletionModal();
       renderSchedule();
       setTimeout(() => updateDuePanel(true), 300);
