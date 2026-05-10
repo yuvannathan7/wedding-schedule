@@ -1,0 +1,777 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Yuvan &amp; Pugalini Wedding Schedule</title>
+  <meta name="description" content="Live wedding schedule connected to Google Sheets with assignee task tabs" />
+  <style>
+    :root {
+      --bg: #fff8ee;
+      --panel: rgba(255, 255, 255, 0.9);
+      --ink: #332016;
+      --muted: #775f50;
+      --gold: #b88a2d;
+      --gold-2: #f1d89a;
+      --maroon: #7b1f2a;
+      --green: #2f7d4f;
+      --red: #b43636;
+      --line: rgba(123,31,42,.16);
+      --shadow: 0 22px 70px rgba(77, 38, 10, .14);
+      --radius: 24px;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(184, 138, 45, .20), transparent 34rem),
+        radial-gradient(circle at 90% 0%, rgba(123, 31, 42, .12), transparent 30rem),
+        linear-gradient(180deg, #fff7ea 0%, #fffdf9 56%, #fff7ea 100%);
+      min-height: 100vh;
+    }
+    .wrap { max-width: 1120px; margin: 0 auto; padding: 28px 18px 70px; }
+    .hero {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid rgba(184, 138, 45, .25);
+      background: linear-gradient(135deg, rgba(123,31,42,.96), rgba(136,54,35,.90));
+      color: white;
+      border-radius: 34px;
+      padding: clamp(28px, 7vw, 72px);
+      box-shadow: var(--shadow);
+    }
+    .hero::after {
+      content: "";
+      position: absolute;
+      width: 320px;
+      height: 320px;
+      border-radius: 999px;
+      background: radial-gradient(circle, rgba(241,216,154,.55), transparent 65%);
+      right: -120px;
+      top: -120px;
+    }
+    .eyebrow {
+      display: inline-flex;
+      gap: 10px;
+      align-items: center;
+      padding: 8px 13px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.14);
+      border: 1px solid rgba(255,255,255,.22);
+      font-size: 13px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    h1 {
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: clamp(42px, 8vw, 86px);
+      line-height: .96;
+      margin: 22px 0 14px;
+      letter-spacing: -.04em;
+    }
+    .hero p { max-width: 760px; margin: 0; color: rgba(255,255,255,.88); font-size: clamp(16px, 2.2vw, 22px); }
+    .hero-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; }
+    button, .btn {
+      appearance: none;
+      border: 0;
+      cursor: pointer;
+      text-decoration: none;
+      font-weight: 800;
+      border-radius: 999px;
+      padding: 12px 18px;
+      background: #fff;
+      color: var(--maroon);
+      box-shadow: 0 10px 26px rgba(0,0,0,.12);
+      font: inherit;
+    }
+    button:disabled { opacity: .55; cursor: not-allowed; }
+    .btn.secondary { background: rgba(255,255,255,.14); color: white; border: 1px solid rgba(255,255,255,.25); box-shadow: none; }
+    .stats { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 14px; margin: 18px 0 20px; }
+    .stat { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; box-shadow: 0 12px 40px rgba(77,38,10,.07); }
+    .stat strong { display: block; font-size: 30px; color: var(--maroon); }
+    .stat span { color: var(--muted); font-size: 14px; }
+    .live-panel {
+      margin: 18px 0 14px;
+      border: 1px solid rgba(184, 138, 45, .28);
+      border-radius: 22px;
+      padding: 14px 16px;
+      background: rgba(255, 255, 255, .76);
+      box-shadow: 0 12px 34px rgba(77, 38, 10, .08);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+    }
+    .live-panel strong { display:block; color: var(--maroon); margin-bottom: 3px; }
+    .live-panel span { display:block; color: var(--muted); font-size: .95rem; line-height: 1.45; }
+    .btn.mini { padding: 10px 14px; white-space: nowrap; font-size: .92rem; }
+    .toolbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      backdrop-filter: blur(15px);
+      background: rgba(255, 248, 238, .9);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      margin: 18px 0;
+      padding: 10px;
+      display: grid;
+      gap: 10px;
+      box-shadow: 0 10px 30px rgba(77,38,10,.08);
+    }
+    .toolbar-row { display: flex; gap: 8px; align-items: center; }
+    .search {
+      min-width: min(330px, 100%);
+      flex: 1;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: white;
+      padding: 12px 16px;
+      color: var(--ink);
+      font: inherit;
+    }
+    .tabs {
+      display: flex;
+      overflow-x: auto;
+      gap: 8px;
+      padding: 2px 0 4px;
+      scrollbar-width: thin;
+    }
+    .tab {
+      flex: 0 0 auto;
+      border: 1px solid rgba(123,31,42,.18);
+      background: #fff;
+      color: var(--maroon);
+      box-shadow: none;
+      padding: 10px 14px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .tab.active {
+      background: var(--maroon);
+      color: #fff;
+      border-color: var(--maroon);
+    }
+    .tab-count {
+      min-width: 24px;
+      height: 24px;
+      border-radius: 999px;
+      display: inline-grid;
+      place-items: center;
+      background: rgba(184,138,45,.16);
+      font-size: 12px;
+      padding: 0 7px;
+    }
+    .tab.active .tab-count { background: rgba(255,255,255,.18); }
+    .due-panel {
+      margin: 10px 0 22px;
+      border-radius: 22px;
+      padding: 14px 16px;
+      background: #fff;
+      border: 1px solid rgba(184,138,45,.28);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      box-shadow: 0 10px 30px rgba(77,38,10,.07);
+    }
+    .due-panel strong { color: var(--maroon); display:block; }
+    .due-panel span { color: var(--muted); display:block; font-size: 14px; margin-top: 3px; }
+    .section-head { display:flex; align-items:flex-end; justify-content:space-between; gap:16px; margin: 34px 0 16px; }
+    h2 { font-family: Georgia, "Times New Roman", serif; font-size: clamp(32px, 5vw, 52px); line-height: 1; margin: 0; color: var(--maroon); }
+    .section-lead { color: var(--muted); margin: 6px 0 0; max-width: 760px; }
+    .day { margin: 26px 0; }
+    .day-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      position: sticky;
+      top: 130px;
+      z-index: 7;
+      background: linear-gradient(90deg, #fff, #fff7ea);
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      padding: 13px 16px;
+      box-shadow: 0 10px 28px rgba(77,38,10,.08);
+    }
+    .day-title h3 { margin: 0; font-size: 19px; }
+    .pill { display: inline-flex; align-items:center; justify-content:center; border-radius: 999px; background: rgba(184,138,45,.14); color: #7b5315; padding: 6px 10px; font-weight: 800; font-size: 12px; }
+    .timeline { margin-top: 13px; display: grid; gap: 12px; }
+    .event {
+      display: grid;
+      grid-template-columns: 112px minmax(0,1fr);
+      gap: 14px;
+      background: white;
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      padding: 16px;
+      box-shadow: 0 14px 42px rgba(77,38,10,.08);
+      position: relative;
+    }
+    .event.due { border-color: rgba(180,54,54,.45); background: linear-gradient(180deg, #fff, #fff7f4); }
+    .event.completed { opacity: .78; border-color: rgba(47,125,79,.36); }
+    .event.completed h4 { text-decoration: line-through; text-decoration-thickness: 2px; text-decoration-color: rgba(47,125,79,.55); }
+    .time {
+      min-height: 64px;
+      border-radius: 16px;
+      display: grid;
+      place-items: center;
+      text-align: center;
+      background: linear-gradient(180deg, rgba(184,138,45,.22), rgba(184,138,45,.08));
+      color: var(--maroon);
+      font-weight: 900;
+      border: 1px solid rgba(184,138,45,.24);
+    }
+    .event h4 { margin: 0 0 8px; font-size: 18px; }
+    .meta { display:flex; flex-wrap:wrap; gap: 8px; margin-top: 10px; }
+    .tag { border-radius: 999px; padding: 7px 10px; background: #fff7ea; border: 1px solid rgba(184,138,45,.23); color: #654410; font-size: 13px; font-weight: 700; }
+    .tag.done { background: rgba(47,125,79,.10); border-color: rgba(47,125,79,.28); color: var(--green); }
+    .tag.due { background: rgba(180,54,54,.09); border-color: rgba(180,54,54,.28); color: var(--red); }
+    .details { color: var(--muted); margin: 0; line-height: 1.5; }
+    .event-actions { margin-top: 14px; display:flex; flex-wrap:wrap; gap: 8px; }
+    .action-btn { box-shadow: none; padding: 9px 13px; font-size: 14px; background: var(--maroon); color: #fff; }
+    .action-btn.undo { background: rgba(47,125,79,.11); color: var(--green); border: 1px solid rgba(47,125,79,.24); }
+    .empty { padding: 22px; border-radius: var(--radius); background:white; border:1px dashed var(--line); color: var(--muted); }
+    footer { margin-top: 40px; color: var(--muted); text-align: center; font-size: 13px; }
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(30, 16, 10, .54);
+      z-index: 100;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+    }
+    .modal-backdrop.show { display: flex; }
+    .modal {
+      width: min(540px, 100%);
+      background: #fff;
+      border-radius: 28px;
+      border: 1px solid rgba(184,138,45,.30);
+      padding: 22px;
+      box-shadow: 0 30px 90px rgba(0,0,0,.28);
+    }
+    .modal h3 { margin: 0 0 8px; color: var(--maroon); font-family: Georgia, "Times New Roman", serif; font-size: 30px; }
+    .modal p { color: var(--muted); line-height: 1.55; }
+    .modal-card { background: #fff8ee; border: 1px solid var(--line); border-radius: 18px; padding: 14px; margin: 14px 0; }
+    .modal-card strong { display:block; margin-bottom: 5px; color: var(--ink); }
+    .modal-actions { display:flex; flex-wrap:wrap; gap: 10px; justify-content:flex-end; margin-top: 16px; }
+    .modal-actions .secondary-dark { background: #fff; color: var(--maroon); border: 1px solid var(--line); box-shadow:none; }
+    @media (max-width: 820px) {
+      .stats { grid-template-columns: repeat(2, minmax(0,1fr)); }
+      .event { grid-template-columns: 1fr; }
+      .time { width: fit-content; min-height: unset; padding: 9px 12px; }
+      .day-title { top: 158px; align-items:flex-start; flex-direction: column; }
+      .toolbar-row { flex-direction: column; align-items: stretch; }
+      .live-panel, .due-panel { flex-direction: column; align-items: stretch; }
+      .btn.mini { width: 100%; }
+    }
+    @media (max-width: 520px) {
+      .stats { grid-template-columns: 1fr; }
+      .day-title { top: 176px; }
+    }
+    @media print {
+      body { background: white; }
+      .hero-actions, .toolbar, .live-panel, .due-panel, .event-actions, .modal-backdrop { display:none !important; }
+      .hero, .stat, .event { box-shadow:none; }
+      .day-title { position: static; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="hero">
+      <div class="eyebrow">Wedding schedule</div>
+      <h1>Yuvan &amp;<br/>Pugalini</h1>
+      <p>Live marriage schedule with automatic person tabs, due checks and hidden completed tasks.</p>
+      <div class="hero-actions">
+        <a class="btn" href="#schedule">View schedule</a>
+        <button class="btn secondary" onclick="window.print()">Print / save PDF</button>
+      </div>
+    </header>
+
+    <div class="stats" aria-label="Schedule summary">
+      <div class="stat"><strong id="taskStat">0</strong><span>Schedule tasks</span></div>
+      <div class="stat"><strong id="dayStat">0</strong><span>Schedule days</span></div>
+      <div class="stat"><strong id="peopleStat">0</strong><span>Assigned people</span></div>
+      <div class="stat"><strong id="mainDayStat">20 Jun</strong><span>Main wedding day</span></div>
+    </div>
+
+    <div class="live-panel" aria-live="polite">
+      <div>
+        <strong id="liveStatusTitle">Connecting to Google Sheet...</strong>
+        <span id="liveStatusText">The schedule and assignee tabs update from the Google Sheet automatically while this page is open.</span>
+      </div>
+      <button class="btn mini" id="refreshButton" type="button">Refresh from sheet</button>
+    </div>
+
+    <div class="toolbar" aria-label="Schedule search and person tabs">
+      <div class="toolbar-row">
+        <input id="search" class="search" type="search" placeholder="Search schedule, person, detail..." aria-label="Search schedule" />
+        <button class="btn mini" id="allButton" type="button">Show all</button>
+      </div>
+      <div class="tabs" id="assigneeTabs" aria-label="Assigned person tabs"></div>
+    </div>
+
+    <div class="due-panel" aria-live="polite">
+      <div>
+        <strong id="dueTitle">Current time check</strong>
+        <span id="dueText">Choose a person tab to see if any tasks are due for them.</span>
+      </div>
+      <button class="btn mini" id="checkNowButton" type="button">Check due tasks</button>
+    </div>
+
+    <main id="schedule">
+      <div class="section-head">
+        <div>
+          <h2 id="scheduleHeading">Schedule</h2>
+          <p class="section-lead" id="scheduleLead">Choose a person tab to show only their remaining tasks in date and time order.</p>
+        </div>
+        <span class="pill" id="matchCount">0 tasks</span>
+      </div>
+      <div id="scheduleList"></div>
+    </main>
+
+    <footer>Connected to your Google Sheet. Assignee tabs rebuild automatically from the latest sheet. Completed personal tasks are hidden on this phone/browser.</footer>
+  </div>
+
+  <div class="modal-backdrop" id="completionModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+    <div class="modal">
+      <h3 id="modalTitle">Task due</h3>
+      <p id="modalText">Please confirm whether this task has been completed. It will disappear from this person’s tab on this device.</p>
+      <div class="modal-card" id="modalTaskCard"></div>
+      <div class="modal-actions">
+        <button class="secondary-dark" id="modalLater" type="button">Remind me later</button>
+        <button id="modalComplete" type="button">Confirm completed</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const SHEET_ID = '1FeeC-nFDpjI9Cioyt24oSTeg6kiXbaY2WeHJhJ7dmXM';
+    const MARRIAGE_SHEET = 'Marriage Schedule';
+    const fallbackSchedule = [{"row": 2, "task": "Palakaram pick up from the supplier", "dateISO": "2026-06-14", "dateLong": "Sunday 14 June 2026", "time": "", "details": "", "assigned": "Abi + Amirthesh"}, {"row": 3, "task": "Palakaram box to be made", "dateISO": "2026-06-17", "dateLong": "Wednesday 17 June 2026", "time": "", "details": "", "assigned": "Everyone home"}, {"row": 4, "task": "Palakaram pack up in a box and ready for transport", "dateISO": "2026-06-17", "dateLong": "Wednesday 17 June 2026", "time": "", "details": "", "assigned": "Arulini,Yal"}, {"row": 5, "task": "Pick up suganthy aunty LHW", "dateISO": "2026-06-18", "dateLong": "Thursday 18 June 2026", "time": "08:05", "details": "", "assigned": "Meithiniyan +mathy"}, {"row": 6, "task": "Ponnurukku", "dateISO": "2026-06-18", "dateLong": "Thursday 18 June 2026", "time": "", "details": "", "assigned": ""}, {"row": 7, "task": "Arcchari pick up From Harrow", "dateISO": "2026-06-18", "dateLong": "Thursday 18 June 2026", "time": "", "details": "", "assigned": "Abi+Arvalan"}, {"row": 8, "task": "Ponnurukku Ceremony", "dateISO": "2026-06-18", "dateLong": "Thursday 18 June 2026", "time": "", "details": "", "assigned": ""}, {"row": 9, "task": "Ponnurukku start", "dateISO": "2026-06-18", "dateLong": "Thursday 18 June 2026", "time": "", "details": "", "assigned": ""}, {"row": 10, "task": "Ponurrukku end", "dateISO": "2026-06-18", "dateLong": "Thursday 18 June 2026", "time": "", "details": "", "assigned": ""}, {"row": 11, "task": "Ponnurukku food provision", "dateISO": "2026-06-18", "dateLong": "Thursday 18 June 2026", "time": "", "details": "", "assigned": ""}, {"row": 12, "task": "Ponnurukku Food Collection from supplier", "dateISO": "2026-06-18", "dateLong": "Thursday 18 June 2026", "time": "", "details": "", "assigned": ""}, {"row": 13, "task": "Henna artist for pugalini hand+Bride Members", "dateISO": "2026-06-18", "dateLong": "Thursday 18 June 2026", "time": "", "details": "", "assigned": ""}, {"row": 14, "task": "Arcchari Drop-off  From Harrow", "dateISO": "2026-06-18", "dateLong": "Thursday 18 June 2026", "time": "", "details": "", "assigned": ""}, {"row": 25, "task": "Buy rose plant (Day before)", "dateISO": "2026-06-19", "dateLong": "Friday 19 June 2026", "time": "10:00", "details": "", "assigned": "Bala + Seermaran"}, {"row": 15, "task": "Saami aria set up in grooms place", "dateISO": "2026-06-19", "dateLong": "Friday 19 June 2026", "time": "11:00", "details": "", "assigned": "Babu"}, {"row": 16, "task": "Arrange the extra drinks for emergency", "dateISO": "2026-06-19", "dateLong": "Friday 19 June 2026", "time": "12:00", "details": "5 x Water,2 x  Fruit juice, 2 x Coke or sprit", "assigned": "Mathy+AK"}, {"row": 17, "task": "Thaali Collection", "dateISO": "2026-06-19", "dateLong": "Friday 19 June 2026", "time": "12:00", "details": "Important Thaali + Metti", "assigned": "Gobi mama family + Abi"}, {"row": 18, "task": "Pugal,Arul and Amma goes to Hotel", "dateISO": "2026-06-19", "dateLong": "Friday 19 June 2026", "time": "17:00", "details": "", "assigned": ""}, {"row": 19, "task": "Arrange 6 tray from Groom side", "dateISO": "2026-06-19", "dateLong": "Friday 19 June 2026", "time": "17:00", "details": "", "assigned": "Jeeva"}, {"row": 20, "task": "Decoration for arugamopul paal", "dateISO": "2026-06-19", "dateLong": "Friday 19 June 2026", "time": "17:00", "details": "", "assigned": "Methiniyan"}, {"row": 21, "task": "Flower collection from Rithika flowers to deliver to pugalini Hotel", "dateISO": "2026-06-19", "dateLong": "Friday 19 June 2026", "time": "18:00", "details": "", "assigned": "Seermaran+Ashoka"}, {"row": 22, "task": "Load Palakaram into the car", "dateISO": "2026-06-19", "dateLong": "Friday 19 June 2026", "time": "20:00", "details": "Palakaram + 5 Tray for flowers + 4 Tray for kartkandu + Leaflet + 2 Tray for malligai poo + Kuththuvilakku set + 2 x Post box + Leaflet", "assigned": "Seermaran+Ashoka"}, {"row": 23, "task": "Take niraikudam set from brides house to Hall", "dateISO": "2026-06-19", "dateLong": "Friday 19 June 2026", "time": "20:00", "details": "", "assigned": "Seermaran+Ashoka"}, {"row": 24, "task": "Transport Palakaram to Hotel", "dateISO": "2026-06-19", "dateLong": "Friday 19 June 2026", "time": "20:00", "details": "", "assigned": "Seermaran+Ashoka"}, {"row": 26, "task": "Background banner", "dateISO": "2026-06-19", "dateLong": "Friday 19 June 2026", "time": "20:00", "details": "", "assigned": "Seermaran"}, {"row": 27, "task": "Pugalini Make- up Start", "dateISO": "2026-06-20", "dateLong": "Saturday 20 June 2026", "time": "04:00", "details": "", "assigned": ""}, {"row": 28, "task": "Niraikudam set up at the Grooms House", "dateISO": "2026-06-20", "dateLong": "Saturday 20 June 2026", "time": "04:00", "details": "", "assigned": ""}, {"row": 29, "task": "Make up artist arival to the Groom side", "dateISO": "2026-06-20", "dateLong": "Saturday 20 June 2026", "time": "04:00", "details": "", "assigned": ""}, {"row": 30, "task": "Arugampul and milk set up", "dateISO": "2026-06-20", "dateLong": "Saturday 20 June 2026", "time": "04:30", "details": "Arugampul + Milk", "assigned": "Methiniyan"}, {"row": 31, "task": "Photographer arrival at the grooms house", "dateISO": "2026-06-20", "dateLong": "Saturday 20 June 2026", "time": "04:45", "details": "", "assigned": ""}, {"row": 32, "task": "Mappilai Alaippu", "dateISO": "2026-06-20", "dateLong": "Saturday 20 June 2026", "time": "04:45", "details": "", "assigned": ""}, {"row": 33, "task": "Niraikudam set up at the Brides  House", "dateISO": "2026-06-20", "dateLong": "Saturday 20 June 2026", "time": "05:00", "details": "", "assigned": "Shiya"}, {"row": 34, "task": "Arugampul and paal ceremony start", "dateISO": "2026-06-20", "dateLong": "Saturday 20 June 2026", "time": "05:00", "details": "", "assigned": "Gobi"}, {"row": 35, "task": "Brides appa and Amma Leaves home to hall", "dateISO": "2026-06-20", "dateLong": "Saturday 20 June 2026", "time": "05:30", "details": "", "assigned": ""}, {"row": 36, "task": "Hall open", "dateISO": "2026-06-20", "dateLong": "Saturday 20 June 2026", "time": "06:00", "details": "", "assigned": ""}, {"row": 37, "task": "Yaala ready by", "dateISO": "2026-06-20", "dateLong": "Saturday 20 June 2026", "time": "06:00", "details": "", "assigned": ""}, {"row": 38, "task": "Pugalini Arival at the hall", "dateISO": "2026-06-20", "dateLong": "Saturday 20 June 2026", "time": "06:30", "details": "", "assigned": ""}, {"row": 39, "task": "Grooms mates Arival", "dateISO": "2026-06-20", "dateLong": "Saturday 20 June 2026", "time": "06:30", "details": "Making sure all the groomsmate are on time", "assigned": "Akilan"}, {"row": 40, "task": "Catering Arrival(Ruby)", "dateISO": "2026-06-20", "dateLong": "Saturday 20 June 2026", "time": "07:00", "details": "", "assigned": ""}, {"row": 41, "task": "Photographer arrival at the hall - Bride side", "dateISO": "2026-06-20", "dateLong": "Saturday 20 June 2026", "time": "07:00", "details": "", "assigned": ""}, {"row": 42, "task": "Groom ready by", "dateISO": "2026-06-20", "dateLong": "Saturday 20 June 2026", "time": "07:00", "details": "", "assigned": "Akilan"}, {"row": 43, "task": "Family+Grooms mate departure to the hall", "dateISO": "2026-06-20", "dateLong": "Saturday 20 June 2026", "time": "07:00", "details": "", "assigned": "Akilan"}, {"row": 44, "task": "Pugalini Hair and makeup done by", "dateISO": "2026-06-20", "dateLong": "Saturday 20 June 2026", "time": "07:30", "details": "", "assigned": ""}, {"row": 45, "task": "Grooms mother Ready by", "dateISO": "2026-06-20", "dateLong": "Saturday 20 June 2026", "time": "07:30", "details": "", "assigned": ""}, {"row": 46, "task": "Bridesmaid arrival", "dateISO": "2026-06-20", "dateLong": "Saturday 20 June 2026", "time": "07:45", "details": "", "assigned": "Karthi"}, {"row": 47, "task": "Grooms+Grooms mate pictures", "dateISO": "2026-06-20", "dateLong": "Saturday 20 June 2026", "time": "07:45", "details": "", "assigned": "Akilan"}, {"row": 48, "task": "Maligai poo arrangement", "dateISO": "2026-06-20", "dateLong": "Saturday 20 June 2026", "time": "08:00", "details": "", "assigned": ""}, {"row": 49, "task": "Brides+Bridesmate  photoshoot start", "dateISO": "2026-06-20", "dateLong": "Saturday 20 June 2026", "time": "08:30", "details": "", "assigned": ""}, {"row": 50, "task": "Family Breakfast start", "dateISO": "2026-06-20", "dateLong": "Saturday 20 June 2026", "time": "09:00", "details": "", "assigned": ""}, {"row": 51, "task": "Arulini + Amma Makeup done by", "dateISO": "2026-06-20", "dateLong": "Saturday 20 June 2026", "time": "09:00", "details": "", "assigned": ""}, {"row": 52, "task": "Maligai Poo set-up outside in the foyer", "dateISO": "2026-06-20", "dateLong": "Saturday 20 June 2026", "time": "09:00", "details": "", "assigned": ""}, {"row": 53, "task": "Ruby set up By", "dateISO": "2026-06-20", "dateLong": "Saturday 20 June 2026", "time": "09:00", "details": "45 Round Tables, 2X buffet Setup, 10 Chairs for each table", "assigned": ""}, {"row": 54, "task": "Orchestras arrival", "dateISO": "2026-06-20", "dateLong": "Saturday 20 June 2026", "time": "09:00", "details": "", "assigned": ""}, {"row": 55, "task": "DJ arrival", "dateISO": "2026-06-20", "dateLong": "Saturday 20 June 2026", "time": "09:00", "details": "", "assigned": ""}, {"row": 56, "task": "Shorties Start", "dateISO": "2026-06-20", "dateLong": "Saturday 20 June 2026", "time": "10:00", "details": "Downstairs Hall", "assigned": ""}, {"row": 57, "task": "Family Breakfast End", "dateISO": "2026-06-20", "dateLong": "Saturday 20 June 2026", "time": "10:00", "details": "Downstairs Hall", "assigned": ""}, {"row": 58, "task": "DJ setup", "dateISO": "2026-06-20", "dateLong": "Saturday 20 June 2026", "time": "10:00", "details": "", "assigned": ""}, {"row": 59, "task": "Bride +Brides mate  photoshoot end", "dateISO": "2026-06-20", "dateLong": "Saturday 20 June 2026", "time": "10:00", "details": "", "assigned": ""}, {"row": 60, "task": "Grooms Arival to the Hall", "dateISO": "2026-06-20", "dateLong": "Saturday 20 June 2026", "time": "10:00", "details": "", "assigned": "Akilan"}, {"row": 61, "task": "Announce Everyone to go upstairs", "dateISO": "2026-06-20", "dateLong": "Saturday 20 June 2026", "time": "10:15", "details": "", "assigned": ""}, {"row": 62, "task": "Sorties to be served Upstairs", "dateISO": "2026-06-20", "dateLong": "Saturday 20 June 2026", "time": "10:15", "details": "Preplated shorties and Drink to be set up on the right side of the hall", "assigned": ""}, {"row": 63, "task": "Iyar arival", "dateISO": "2026-06-20", "dateLong": "Saturday 20 June 2026", "time": "10:30", "details": "", "assigned": ""}, {"row": 64, "task": "Grooms ceremony near the welcome area", "dateISO": "2026-06-20", "dateLong": "Saturday 20 June 2026", "time": "10:30", "details": "Aalathi - Tharani + Anusha (Ajanthini). Maapilai Malai - Bala. Ring exchange with Aarvalan", "assigned": ""}, {"row": 65, "task": "Brides first entry", "dateISO": "2026-06-20", "dateLong": "Saturday 20 June 2026", "time": "11:15", "details": "Announce everyone to be seated for brides entry shorties to be paused", "assigned": ""}, {"row": 66, "task": "Shorties Stop", "dateISO": "2026-06-20", "dateLong": "Saturday 20 June 2026", "time": "11:15", "details": "", "assigned": ""}, {"row": 67, "task": "Bride goes for Saree change", "dateISO": "2026-06-20", "dateLong": "Saturday 20 June 2026", "time": "11:45", "details": "Serve drinks for seated guest", "assigned": ""}, {"row": 68, "task": "Brides second entry", "dateISO": "2026-06-20", "dateLong": "Saturday 20 June 2026", "time": "12:15", "details": "Announce brides second entry, Pause food services", "assigned": ""}, {"row": 69, "task": "Thaali kattu", "dateISO": "2026-06-20", "dateLong": "Saturday 20 June 2026", "time": "12:30", "details": "", "assigned": ""}, {"row": 70, "task": "Lunch Start", "dateISO": "2026-06-20", "dateLong": "Saturday 20 June 2026", "time": "13:00", "details": "Announce families with kids to go for food first", "assigned": "Sangeethan"}, {"row": 71, "task": "Post thaali kattu Ceremoney end by", "dateISO": "2026-06-20", "dateLong": "Saturday 20 June 2026", "time": "13:00", "details": "", "assigned": ""}, {"row": 72, "task": "Family Lunch start", "dateISO": "2026-06-20", "dateLong": "Saturday 20 June 2026", "time": "14:30", "details": "Downstairs Hall", "assigned": ""}, {"row": 73, "task": "Lunch finish", "dateISO": "2026-06-20", "dateLong": "Saturday 20 June 2026", "time": "15:00", "details": "", "assigned": ""}, {"row": 74, "task": "Leave hall", "dateISO": "2026-06-20", "dateLong": "Saturday 20 June 2026", "time": "16:00", "details": "", "assigned": ""}, {"row": 75, "task": "Grooms entry", "dateISO": "2026-06-20", "dateLong": "Saturday 20 June 2026", "time": "", "details": "", "assigned": ""}, {"row": 76, "task": "Event finish by", "dateISO": "2026-06-20", "dateLong": "Saturday 20 June 2026", "time": "", "details": "", "assigned": ""}, {"row": 77, "task": "Leave the hall by", "dateISO": "2026-06-20", "dateLong": "Saturday 20 June 2026", "time": "", "details": "", "assigned": ""}, {"row": 78, "task": "Return Gift start", "dateISO": "2026-06-20", "dateLong": "Saturday 20 June 2026", "time": "", "details": "", "assigned": "Ashoka"}, {"row": 79, "task": "Start welcoming guest", "dateISO": "2026-06-20", "dateLong": "Saturday 20 June 2026", "time": "", "details": "", "assigned": "Thangaraja+Gobi+Gananaathan+Vaani(Mohan Standby)"}, {"row": 80, "task": "Hall decoration to be done by", "dateISO": "2026-06-20", "dateLong": "Saturday 20 June 2026", "time": "", "details": "", "assigned": ""}, {"row": 81, "task": "Downstairs Hall set-up", "dateISO": "2026-06-20", "dateLong": "Saturday 20 June 2026", "time": "", "details": "", "assigned": ""}, {"row": 82, "task": "Food ready to be served by", "dateISO": "2026-06-20", "dateLong": "Saturday 20 June 2026", "time": "", "details": "", "assigned": ""}, {"row": 83, "task": "Grooms side check before leaving", "dateISO": "2026-06-20", "dateLong": "Saturday 20 June 2026", "time": "", "details": "", "assigned": "Mayutharan"}];
+
+    let schedule = [...fallbackSchedule];
+    let dates = [];
+    let assigneeList = [];
+    let activeAssignee = 'All';
+    let modalTask = null;
+    const STORAGE_PREFIX = 'weddingTaskDone:v2:';
+    const AUTO_REFRESH_MS = 60 * 1000;
+    const REMIND_PREFIX = 'weddingTaskRemindLater:v2:';
+    const REMIND_MS = 15 * 60 * 1000;
+
+    const escapeHTML = (value) => String(value || '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+    const clean = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
+    const pad = (num) => String(num).padStart(2, '0');
+
+    function setStatus(title, text) {
+      document.getElementById('liveStatusTitle').textContent = title;
+      document.getElementById('liveStatusText').textContent = text;
+    }
+
+    function getCell(row, index) {
+      const cell = row?.c?.[index];
+      if (!cell) return '';
+      return cell.f ?? cell.v ?? '';
+    }
+
+    function parseGoogleDate(value) {
+      if (!value) return null;
+      const text = String(value).trim();
+      const match = text.match(/^Date\((\d+),(\d+),(\d+)(?:,(\d+),(\d+),(\d+))?\)$/);
+      if (match) {
+        const year = Number(match[1]);
+        const month = Number(match[2]);
+        const day = Number(match[3]);
+        return { iso: `${year}-${pad(month + 1)}-${pad(day)}` };
+      }
+      const isoMatch = text.match(/(20\d{2})[-/](\d{1,2})[-/](\d{1,2})/);
+      if (isoMatch) {
+        const year = Number(isoMatch[1]);
+        const month = Number(isoMatch[2]);
+        const day = Number(isoMatch[3]);
+        return { iso: `${year}-${pad(month)}-${pad(day)}` };
+      }
+      const maybe = new Date(text);
+      if (!Number.isNaN(maybe.getTime())) {
+        return { iso: `${maybe.getFullYear()}-${pad(maybe.getMonth() + 1)}-${pad(maybe.getDate())}` };
+      }
+      return null;
+    }
+
+    function parseTime(value) {
+      if (!value) return '';
+      const text = String(value).trim();
+      if (!text) return '';
+      const dateMatch = text.match(/^Date\(\d+,\d+,\d+,(\d+),(\d+),(\d+)\)$/);
+      if (dateMatch) return `${pad(dateMatch[1])}:${pad(dateMatch[2])}`;
+      const timeMatch = text.match(/(?:^|\s)(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)?/i);
+      if (timeMatch) {
+        let hour = Number(timeMatch[1]);
+        const minute = Number(timeMatch[2]);
+        const meridiem = timeMatch[3]?.toUpperCase();
+        if (meridiem === 'PM' && hour < 12) hour += 12;
+        if (meridiem === 'AM' && hour === 12) hour = 0;
+        return `${pad(hour)}:${pad(minute)}`;
+      }
+      const hourOnly = text.match(/^(\d{1,2})\s*(AM|PM)$/i);
+      if (hourOnly) {
+        let hour = Number(hourOnly[1]);
+        const meridiem = hourOnly[2].toUpperCase();
+        if (meridiem === 'PM' && hour < 12) hour += 12;
+        if (meridiem === 'AM' && hour === 12) hour = 0;
+        return `${pad(hour)}:00`;
+      }
+      return text;
+    }
+
+    function dateLongFromISO(iso) {
+      if (!iso) return 'Date TBC';
+      const [year, month, day] = iso.split('-').map(Number);
+      const date = new Date(year, month - 1, day);
+      return date.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    }
+
+    function timeSortValue(value) {
+      if (!value) return 99999;
+      const match = String(value).match(/^(\d{1,2}):(\d{2})$/);
+      if (!match) return 99998;
+      return Number(match[1]) * 60 + Number(match[2]);
+    }
+
+    function taskDateTime(item) {
+      if (!item.dateISO || !item.time) return null;
+      const match = String(item.time).match(/^(\d{1,2}):(\d{2})$/);
+      if (!match) return null;
+      const [year, month, day] = item.dateISO.split('-').map(Number);
+      return new Date(year, month - 1, day, Number(match[1]), Number(match[2]), 0, 0);
+    }
+
+    function isDue(item) {
+      const dt = taskDateTime(item);
+      return dt && dt.getTime() <= Date.now();
+    }
+
+    function splitAssignees(value) {
+      const raw = String(value ?? '').trim();
+      if (!raw) return [];
+      return [...new Set(raw
+        .replace(/\s*&\s*/g, '+')
+        .replace(/\s*\+\s*/g, '+')
+        .split(/\s*(?:\+|,|;|\/|\n|\band\b)\s*/i)
+        .map(part => clean(part))
+        .filter(Boolean)
+      )];
+    }
+
+    function itemAssignees(item) {
+      return splitAssignees(item.assigned);
+    }
+
+    function updateDates() {
+      dates = [...new Map(schedule.map(item => [item.dateISO || 'tbc', { iso: item.dateISO || 'tbc', long: item.dateLong || 'Date TBC' }])).values()];
+      dates.sort((a, b) => (a.iso || '9999').localeCompare(b.iso || '9999'));
+    }
+
+    function updateAssignees() {
+      const people = new Map();
+      schedule.forEach(item => {
+        itemAssignees(item).forEach(name => {
+          const current = people.get(name) || { total: 0, remaining: 0 };
+          current.total += 1;
+          if (!isCompleted(item, name)) current.remaining += 1;
+          people.set(name, current);
+        });
+      });
+      assigneeList = [...people.entries()]
+        .map(([name, counts]) => ({ name, count: counts.remaining, total: counts.total }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+      if (activeAssignee !== 'All' && activeAssignee !== 'Unassigned' && !people.has(activeAssignee)) activeAssignee = 'All';
+    }
+
+    function taskBaseKey(item) {
+      return `${item.row || ''}|${item.dateISO || ''}|${item.time || ''}|${item.task || ''}`;
+    }
+
+    function completionKey(item, assignee) {
+      return STORAGE_PREFIX + encodeURIComponent(`${assignee}|${taskBaseKey(item)}`);
+    }
+
+    function remindKey(item, assignee) {
+      return REMIND_PREFIX + encodeURIComponent(`${assignee}|${taskBaseKey(item)}`);
+    }
+
+    function isCompleted(item, assignee) {
+      return localStorage.getItem(completionKey(item, assignee)) === '1';
+    }
+
+    function setCompleted(item, assignee, completed) {
+      const key = completionKey(item, assignee);
+      if (completed) localStorage.setItem(key, '1');
+      else localStorage.removeItem(key);
+    }
+
+    function recentlyReminded(item, assignee) {
+      const value = Number(localStorage.getItem(remindKey(item, assignee)) || 0);
+      return value && Date.now() - value < REMIND_MS;
+    }
+
+    function remindLater(item, assignee) {
+      localStorage.setItem(remindKey(item, assignee), String(Date.now()));
+    }
+
+    function taskAppliesToAssignee(item, assignee) {
+      if (assignee === 'All') return true;
+      const names = itemAssignees(item);
+      if (assignee === 'Unassigned') return names.length === 0;
+      return names.includes(assignee);
+    }
+
+    function shouldHideCompletedForActiveAssignee(item) {
+      return activeAssignee !== 'All' && activeAssignee !== 'Unassigned' && isCompleted(item, activeAssignee);
+    }
+
+    function visibleItems(ignoreSearch = false) {
+      const q = ignoreSearch ? '' : document.getElementById('search').value.trim().toLowerCase();
+      return schedule
+        .filter(item => taskAppliesToAssignee(item, activeAssignee))
+        .filter(item => !shouldHideCompletedForActiveAssignee(item))
+        .filter(item => !q || [item.task,item.details,item.assigned,item.dateLong,item.time].join(' ').toLowerCase().includes(q))
+        .sort((a, b) => (a.dateISO || '9999').localeCompare(b.dateISO || '9999') || timeSortValue(a.time) - timeSortValue(b.time) || a.row - b.row);
+    }
+
+    function gviz(sheetName) {
+      return new Promise((resolve, reject) => {
+        const callbackName = '__sheetCallback_' + Math.random().toString(36).slice(2);
+        const script = document.createElement('script');
+        const timeout = setTimeout(() => { cleanup(); reject(new Error('Timed out loading sheet')); }, 15000);
+        function cleanup() { clearTimeout(timeout); delete window[callbackName]; script.remove(); }
+        window[callbackName] = (response) => {
+          cleanup();
+          if (response?.status === 'error') reject(new Error(response?.errors?.[0]?.detailed_message || 'Google Sheet error'));
+          else resolve(response.table || { cols: [], rows: [] });
+        };
+        const params = new URLSearchParams({
+          sheet: sheetName,
+          tqx: `out:json;responseHandler:${callbackName}`,
+          cacheBust: String(Date.now())
+        });
+        script.onerror = () => { cleanup(); reject(new Error('Could not load Google Sheet')); };
+        script.src = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?${params.toString()}`;
+        document.head.appendChild(script);
+      });
+    }
+
+    function parseMarriageSheet(table) {
+      const rows = table.rows || [];
+      const newSchedule = [];
+      rows.slice(1).forEach((row, index) => {
+        const task = clean(getCell(row, 0));
+        const parsedDate = parseGoogleDate(getCell(row, 1));
+        const time = parseTime(getCell(row, 2));
+        const details = clean(getCell(row, 3));
+        const assigned = clean(getCell(row, 4));
+        if (task || parsedDate || time || details || assigned) {
+          newSchedule.push({
+            row: index + 2,
+            task: task || 'Untitled task',
+            dateISO: parsedDate?.iso || '',
+            dateLong: parsedDate?.iso ? dateLongFromISO(parsedDate.iso) : 'Date TBC',
+            time,
+            details,
+            assigned
+          });
+        }
+      });
+      newSchedule.sort((a, b) => (a.dateISO || '9999').localeCompare(b.dateISO || '9999') || timeSortValue(a.time) - timeSortValue(b.time) || a.row - b.row);
+      return newSchedule;
+    }
+
+    function renderTabs() {
+      updateAssignees();
+      const unassignedCount = schedule.filter(item => itemAssignees(item).length === 0).length;
+      const tabs = [
+        `<button class="tab ${activeAssignee === 'All' ? 'active' : ''}" data-assignee="All" type="button">All <span class="tab-count">${schedule.length}</span></button>`,
+        ...assigneeList.map(person => `<button class="tab ${activeAssignee === person.name ? 'active' : ''}" data-assignee="${escapeHTML(person.name)}" type="button" title="${person.count} remaining of ${person.total} total tasks">${escapeHTML(person.name)} <span class="tab-count">${person.count}</span></button>`)
+      ];
+      if (unassignedCount) tabs.push(`<button class="tab ${activeAssignee === 'Unassigned' ? 'active' : ''}" data-assignee="Unassigned" type="button">Unassigned <span class="tab-count">${unassignedCount}</span></button>`);
+      document.getElementById('assigneeTabs').innerHTML = tabs.join('');
+      document.getElementById('peopleStat').textContent = assigneeList.length;
+    }
+
+    function eventHTML(item) {
+      const time = item.time || 'Time TBC';
+      const assigned = item.assigned ? `<span class="tag">Assigned: ${escapeHTML(item.assigned)}</span>` : '<span class="tag">Unassigned</span>';
+      const details = item.details ? `<p class="details">${escapeHTML(item.details)}</p>` : '';
+      const personMode = activeAssignee !== 'All' && activeAssignee !== 'Unassigned';
+      const due = personMode && isDue(item);
+      const dueTag = due ? '<span class="tag due">Due now / overdue</span>' : '';
+      const actions = personMode ? `<div class="event-actions">
+        <button class="action-btn" type="button" data-action="complete" data-row="${item.row}">Confirm completed and hide</button>
+      </div>` : '';
+      return `<article class="event ${due ? 'due' : ''}">
+        <div class="time">${escapeHTML(time)}<br><small>${escapeHTML(item.dateISO ? new Date(item.dateISO).toLocaleDateString('en-GB', { day:'numeric', month:'short' }) : 'TBC')}</small></div>
+        <div>
+          <h4>${escapeHTML(item.task)}</h4>
+          ${details}
+          <div class="meta">${assigned}${dueTag}</div>
+          ${actions}
+        </div>
+      </article>`;
+    }
+
+    function renderSchedule() {
+      updateDates();
+      renderTabs();
+      const items = visibleItems();
+      const grouped = new Map();
+      items.forEach(item => {
+        const key = item.dateISO || 'tbc';
+        if (!grouped.has(key)) grouped.set(key, { long: item.dateLong || 'Date TBC', items: [] });
+        grouped.get(key).items.push(item);
+      });
+      const html = [...grouped.entries()].map(([key, group]) => `<section class="day">
+          <div class="day-title"><h3>${escapeHTML(group.long)}</h3><span class="pill">${group.items.length} task${group.items.length === 1 ? '' : 's'}</span></div>
+          <div class="timeline">${group.items.map(eventHTML).join('')}</div>
+        </section>`).join('');
+      let emptyText = 'No schedule items match this tab/search.';
+      if (activeAssignee !== 'All' && activeAssignee !== 'Unassigned' && !items.length) {
+        emptyText = `${activeAssignee} has no remaining tasks. Completed tasks are hidden on this device.`;
+      }
+      document.getElementById('scheduleList').innerHTML = html || `<div class="empty">${escapeHTML(emptyText)}</div>`;
+      document.getElementById('matchCount').textContent = `${items.length} task${items.length === 1 ? '' : 's'}`;
+      document.getElementById('taskStat').textContent = schedule.length;
+      document.getElementById('dayStat').textContent = dates.length;
+      const weddingDay = dates.find(day => day.iso === '2026-06-20') || dates[dates.length - 1];
+      document.getElementById('mainDayStat').textContent = weddingDay?.iso && weddingDay.iso !== 'tbc' ? new Date(weddingDay.iso).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : 'TBC';
+      document.getElementById('scheduleHeading').textContent = activeAssignee === 'All' ? 'Schedule' : `${activeAssignee}'s tasks`;
+      document.getElementById('scheduleLead').textContent = activeAssignee === 'All'
+        ? 'Choose a person tab to show only their remaining tasks in date and time order.'
+        : 'Remaining tasks are shown in date and time order. When a task is confirmed, it disappears from this person’s tab.';
+      updateDuePanel(false);
+    }
+
+    function dueTasksForActiveAssignee() {
+      if (activeAssignee === 'All' || activeAssignee === 'Unassigned') return [];
+      return visibleItems(true).filter(item => isDue(item) && !isCompleted(item, activeAssignee));
+    }
+
+    function updateDuePanel(allowModal = true) {
+      const nowText = new Date().toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' });
+      if (activeAssignee === 'All') {
+        document.getElementById('dueTitle').textContent = 'Current time check';
+        document.getElementById('dueText').textContent = `Current time: ${nowText}. Choose a person tab to check their due tasks.`;
+        return;
+      }
+      if (activeAssignee === 'Unassigned') {
+        document.getElementById('dueTitle').textContent = 'Unassigned tasks';
+        document.getElementById('dueText').textContent = `Current time: ${nowText}. Assign these tasks in Google Sheets so a person can confirm them.`;
+        return;
+      }
+      const due = dueTasksForActiveAssignee();
+      if (!due.length) {
+        document.getElementById('dueTitle').textContent = `${activeAssignee}: no due tasks`;
+        document.getElementById('dueText').textContent = `Current time: ${nowText}. No due/overdue remaining tasks need confirmation.`;
+        return;
+      }
+      const first = due[0];
+      document.getElementById('dueTitle').textContent = `${activeAssignee}: ${due.length} task${due.length === 1 ? '' : 's'} need confirmation`;
+      document.getElementById('dueText').textContent = `Current time: ${nowText}. Next due task: ${first.task} at ${first.time || 'Time TBC'}.`;
+      if (allowModal && !document.getElementById('completionModal').classList.contains('show') && !recentlyReminded(first, activeAssignee)) {
+        showCompletionModal(first);
+      }
+    }
+
+    function showCompletionModal(item) {
+      if (activeAssignee === 'All' || activeAssignee === 'Unassigned') return;
+      modalTask = item;
+      document.getElementById('modalTitle').textContent = `${activeAssignee}, has this been completed?`;
+      document.getElementById('modalText').textContent = 'This task is due or overdue based on the current time on this device. Confirming will hide it from this person’s tab.';
+      document.getElementById('modalTaskCard').innerHTML = `<strong>${escapeHTML(item.task)}</strong>
+        <div>${escapeHTML(item.dateLong || 'Date TBC')} · ${escapeHTML(item.time || 'Time TBC')}</div>
+        ${item.details ? `<div style="margin-top:6px; color: var(--muted);">${escapeHTML(item.details)}</div>` : ''}`;
+      document.getElementById('completionModal').classList.add('show');
+    }
+
+    function closeCompletionModal() {
+      document.getElementById('completionModal').classList.remove('show');
+      modalTask = null;
+    }
+
+    async function loadLiveSheet() {
+      setStatus('Connecting to Google Sheet...', 'Loading the latest schedule rows and assignee tabs.');
+      const refreshButton = document.getElementById('refreshButton');
+      refreshButton.disabled = true;
+      try {
+        const table = await gviz(MARRIAGE_SHEET);
+        const liveSchedule = parseMarriageSheet(table);
+        if (liveSchedule.length) schedule = liveSchedule;
+        // Re-rendering rebuilds assignee tabs from the latest Assigned to column.
+        // If a name is removed or changed in Google Sheets, the old tab disappears.
+        renderSchedule();
+        const now = new Date().toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' });
+        setStatus('Live Google Sheet connected', `Last checked: ${now}. Assignee tabs are rebuilt from the latest Google Sheet data automatically.`);
+      } catch (error) {
+        console.warn(error);
+        schedule = [...fallbackSchedule];
+        renderSchedule();
+        setStatus('Using saved backup schedule', 'The Google Sheet could not be loaded. Check sharing is Anyone with the link, then press refresh.');
+      } finally {
+        refreshButton.disabled = false;
+      }
+    }
+
+    document.getElementById('search').addEventListener('input', renderSchedule);
+    document.getElementById('refreshButton').addEventListener('click', loadLiveSheet);
+    document.getElementById('allButton').addEventListener('click', () => { activeAssignee = 'All'; renderSchedule(); });
+    document.getElementById('checkNowButton').addEventListener('click', () => updateDuePanel(true));
+    document.getElementById('assigneeTabs').addEventListener('click', (event) => {
+      const button = event.target.closest('[data-assignee]');
+      if (!button) return;
+      activeAssignee = button.dataset.assignee;
+      renderSchedule();
+      updateDuePanel(true);
+    });
+    document.getElementById('scheduleList').addEventListener('click', (event) => {
+      const button = event.target.closest('[data-action]');
+      if (!button || activeAssignee === 'All' || activeAssignee === 'Unassigned') return;
+      const row = Number(button.dataset.row);
+      const item = visibleItems(true).find(task => Number(task.row) === row);
+      if (!item) return;
+      setCompleted(item, activeAssignee, button.dataset.action === 'complete');
+      renderSchedule();
+    });
+    document.getElementById('modalLater').addEventListener('click', () => {
+      if (modalTask) remindLater(modalTask, activeAssignee);
+      closeCompletionModal();
+      updateDuePanel(false);
+    });
+    document.getElementById('modalComplete').addEventListener('click', () => {
+      if (modalTask) setCompleted(modalTask, activeAssignee, true);
+      closeCompletionModal();
+      renderSchedule();
+      setTimeout(() => updateDuePanel(true), 300);
+    });
+    document.getElementById('completionModal').addEventListener('click', (event) => {
+      if (event.target.id === 'completionModal') closeCompletionModal();
+    });
+
+    renderSchedule();
+    loadLiveSheet();
+    setInterval(() => updateDuePanel(true), 60 * 1000);
+    setInterval(loadLiveSheet, AUTO_REFRESH_MS);
+    window.addEventListener('focus', loadLiveSheet);
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) loadLiveSheet();
+    });
+  </script>
+</body>
+</html>
